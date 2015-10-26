@@ -11,18 +11,31 @@ class CSFD {
 	public $waiting_time;
 	public $set_proxy;
 	public $set_debug = true;
+	public $folders_config = array('info_folder'=>'download/info','html_folder'=>'download/html','status_folder'=>'download/status','time_folder'=>'download/time','time_stamp_folder'=>'download/time_stamp');
 	
 	public function __construct(){
 		date_default_timezone_set('Europe/London');
+		$this->cli_proc_title(get_class($this));
 	}
 		
-	public function download_to($download_folder){
+	public function download_folder($download_folder){
 		$this->download_folder = $download_folder;
+	}
+	
+	public function setupFolders(){
+		foreach($this->folders_config AS $folder_name=>$folder_path){
+			$folder = $this->download_folder.'/'.$folder_path;
+			if(!file_exists($folder)){
+				mkdir($folder,true);
+			}
+			$this->{$folder_name} = str_replace('\\','/',realpath($folder)).'/';
+		}
 	}
 	
 	public function download_id($download_id){
 		$this->download_id = $download_id;
 	}
+	
 	public function download_max_id($download_max_id){
 		$this->download_max_id = $download_max_id;
 	}
@@ -33,10 +46,6 @@ class CSFD {
 	
 	public function base_url($base_url){
 		$this->base_url = $base_url;
-	}
-	
-	public function time_stamp_folder($time_stamp_folder){
-		$this->time_stamp_folder = $time_stamp_folder;
 	}
 	
 	public function waiting_time($waiting_time){
@@ -58,11 +67,9 @@ class CSFD {
 	$days = intval(intval($seconds) / (3600*24));
 	if($days> 0){
 		if ($days==1){
-			$ret .= $days."den ";
-		}elseif ($days>1 OR $days<5){
-			$ret .= $days."dny ";
+			$ret .= $days."day ";
 		}else{
-			$ret .= $days."dnu ";
+			$ret .= $days."days ";
 		}
 	}
 	/*** get the hours ***/
@@ -101,61 +108,63 @@ class CSFD {
 	return $ret;
 	}
 	
+	public function cli_proc_title($proc_title){
+		if(function_exists('cli_set_process_title')){
+			cli_set_process_title($proc_title);
+		}
+	}
+	
 	public function showInfo(){
-		if(file_exists($this->time_stamp_file)){
-			$get_last_run_time = file_get_contents($this->time_stamp_file);
-			file_put_contents($this->time_stamp_file,time());
+		if (file_exists($this->time_stamp_file)){
+			$last_time_run = date('d.m.Y H:i:s', file_get_contents($this->time_stamp_file));
 		}else{
-			file_put_contents($this->time_stamp_file,time());
-			$get_last_run_time = '--> Jeste nikdy nespusteno <--';
+			$last_time_run = '--> First time run <--';
 		}
-		if (is_numeric($get_last_run_time)){
-			$last_time_run = date('d.m.Y H:i:s', $get_last_run_time);
-		}else{
-			$last_time_run = $get_last_run_time;
-		}
+		file_put_contents($this->time_stamp_file,time());
 		$final_time = ($this->download_max_id * $this->waiting_time);
-		$final_timestamp = ($this->download_max_id * $this->waiting_time) + time();
+		$final_timestamp = $final_time + time();
 		if (file_exists($this->record_file)){
 			$this->last_number = file_get_contents($this->record_file);
 			$current_time = ($this->last_number * $this->waiting_time);
 			$finish_timestamp = $final_timestamp - $current_time;
-			$finish_time = $final_time - $current_time;
+			$this->finish_time = $final_time - $current_time;
 			$rest_of_films = $this->download_max_id - $this->last_number;
 		}else{
 			$finish_timestamp = $final_timestamp;
-			$finish_time = $final_time;
+			$this->finish_time = $final_time;
 			$rest_of_films = $this->download_max_id;
 			$this->last_number = 0;
 			$current_time = 0;
 		}
+		$info = get_class($this).' | [ Done : '.$this->percentage($this->download_max_id,$this->last_number).']';
+			$this->cli_proc_title($info);
 		$this->final_date = date('d.m.Y H:i:s', $finish_timestamp);
-		$speed = $this->waiting_time;
-		$PM1 = (60 / $speed);
-		$PH = ($PM1*60);
-		$PD = $PH*24;
-		$PM2 = $PD*30;
-		$header = 'Cekaci doba pro kazdou stahovanou stranku : '.$speed." sekund\n";
+		$PMI = (60 / $this->waiting_time);
+		$PH = ($PMI*60);
+		$PD = ($PH*24);
+		$PMO = ($PD*30);
+		$header = 'Waiting time for each page to download : '.$this->waiting_time." seconds\n";
 		$header .= '--------------------------------------------------------------------------------'."\n";
-		$header .= 'Rychlost stahovani :'."\n";
-		$header .= $PM1.' stranek/min'."\n";
-		$header .= $PH.' stranek/hodinu'."\n";
-		$header .= $PD.' stranek/den'."\n";
-		$header .= $PM2.' stranek/mesic'."\n\n";
+		$header .= 'Downloading speed :	'.$PMI.' pages/min'."\n";
+		$header .= '			'.$PH.' pages/hour'."\n";
+		$header .= '			'.$PD.' pages/day'."\n";
+		$header .= '			'.$PMO.' pages/month'."\n";
 		$header .= '--------------------------------------------------------------------------------'."\n";
-		$header .= '[Datum spusteni stahovani: '.date('d.m.Y H:i:s', time()).']'."\n";
-		$header .= '[Celkovy uplynuly cas stahovani: '.$this->ConvertSeconds($current_time).']'."\n";
-		$header .= '[ Hotovo : '.$this->percentage($this->download_max_id,$this->last_number).']'."\r\n";
-		$header .= '[Posledni spusteni stahovani: '.$last_time_run.']'."\n";
-		$header .= '[Den ukonceni stahovani: '.$this->final_date.']'."\n";
-		$header .= '[Potrebny celkovy cas ke stazeni vsech dat: '.$this->ConvertSeconds($finish_time).']'."\n\n";
+		$header .= '[Date of run : '.date('d.m.Y H:i:s', time()).']'."\n";
+		$header .= '[Elapsed run time of download : '.$this->ConvertSeconds($current_time).']'."\n";
+		$header .= $info."\n";
+		$header .= '[Date of last run : '.$last_time_run.']'."\n";
+		$header .= '[Expected day to finish : '.$this->final_date.']'."\n";
+		$header .= '[Expected run time to finish : '.$this->ConvertSeconds($this->finish_time).']'."\n";
 		$header .= '--------------------------------------------------------------------------------'."\n";
-		$header .= '[Celkovy pocet stranek: '.$this->download_max_id.']'."\n".'[Pocet stahnutych dat : '.$this->last_number.']'."\n".'[Zbyvajici pocet stranek : '.$rest_of_films.']'."\n\n";
+		$header .= '[Number of pages to download : '.$this->download_max_id.']'."\n";
+		$header .= '[Number of downloaded data : '.$this->last_number.']'."\n";
+		$header .= '[Rest of pages to download : '.$rest_of_films.']'."\n";
 		$header .= '--------------------------------------------------------------------------------'."\n";
 		if($this->set_debug){
 			echo $header;
+			sleep(5);
 		}
-		sleep(10);
 	}
 	
 	public function download_run(){
@@ -164,73 +173,37 @@ class CSFD {
 			sleep(3);
 			die();
 		}
-		if(!file_exists($this->download_folder)){
-			mkdir($this->download_folder,true);
-			mkdir($this->download_folder.'/info',true);
-			mkdir($this->download_folder.'/html',true);
-			mkdir($this->download_folder.'/status',true);
-			mkdir($this->download_folder.'/time',true);
-		}
-		if(!$this->time_stamp_folder){
-			echo 'Please set time_stamp folder!'."\n\r";
-			sleep(3);
-			die();
-		}
-		if(!file_exists($this->time_stamp_folder)){
-			mkdir($this->time_stamp_folder,true);
-		}
-		$this->time_stamp_file = realpath($this->time_stamp_folder).'/time.info';
-		$this->record_file = realpath($this->time_stamp_folder).'/record.info';
+		$this->setupFolders();
+		$this->time_stamp_file = $this->time_stamp_folder.'time.info';
+		$this->record_file = $this->time_stamp_folder.'record.info';
 		if($this->download_url){
-			$page = $this->get_page($this->download_url);
-			$csfd_id = uniqid();
-			$hash = sha1($page['csfd_url_location']);
-					if($page['csfd_url_status']=='con_error'){/*do nothing*/}else{
-						if($this->set_proxy){
-							file_put_contents(realpath($this->download_folder).'/html/'.$csfd_id.'_'.$hash.'.html',file_get_contents($page['csfd_url_location'],false,stream_context_get_default()));
-						}else{
-							file_put_contents(realpath($this->download_folder).'/html/'.$csfd_id.'_'.$hash.'.html',file_get_contents($page['csfd_url_location']));
-						}
-					}
-				file_put_contents(realpath($this->download_folder).'/info/'.$csfd_id.'.info',$page['csfd_url_location']);
-				file_put_contents(realpath($this->download_folder).'/status/'.$csfd_id.'_status.info',$page['csfd_url_status']);
-				file_put_contents(realpath($this->download_folder).'/time/'.$csfd_id.'_time.info',time());
-				file_put_contents($this->time_stamp_file,time());
-				file_put_contents($this->record_file,$csfd_id);
+				$this->cli_proc_title(get_class($this).' | Page : '.$this->download_url);
+			$this->download_info();
 		}else{
 			if(!$this->base_url){
 				echo 'Please set base_url!'."\n\r";
 				sleep(3);
 				die();
 			}
-			$count = 1;
 			if($this->download_max_id){
 				$this->showInfo();
-				for($csfd_id=$this->download_min_id;$csfd_id<=$this->download_max_id;$csfd_id++){
+				if($this->last_number>$this->download_min_id){
+					$start_id = $this->last_number;
+				}else{
+					$start_id = $this->download_min_id;
+				}
+				for($csfd_id=$start_id;$csfd_id<=$this->download_max_id;$csfd_id++){
 					if(!$this->waiting_time){
 						echo 'Please set waiting_time!'."\n\r";
 						sleep(3);
 						die();
 					}
 					if($this->last_number<$csfd_id){
-						$page = $this->get_page($this->base_url.$csfd_id);
-						$hash = sha1($page['csfd_url_location']);
-						if($page['csfd_url_status']=='con_error'){/*do nothing*/}else{
-							if($this->set_proxy){
-								file_put_contents(realpath($this->download_folder).'/html/'.$csfd_id.'_'.$hash.'.html',file_get_contents($page['csfd_url_location'],false,stream_context_get_default()));
-							}else{
-								file_put_contents(realpath($this->download_folder).'/html/'.$csfd_id.'_'.$hash.'.html',file_get_contents($page['csfd_url_location']));
-							}
-						}
-						file_put_contents(realpath($this->download_folder).'/info/'.$csfd_id.'.info',$page['csfd_url_location']);
-						file_put_contents(realpath($this->download_folder).'/status/'.$csfd_id.'_status.info',$page['csfd_url_status']);
-						file_put_contents(realpath($this->download_folder).'/time/'.$csfd_id.'_time.info',time());
-						file_put_contents($this->time_stamp_file,time());
-						file_put_contents($this->record_file,$csfd_id);
+						$info = get_class($this).' | [Done : '.$this->percentage($this->download_max_id,$csfd_id).'] -> Page : '.$csfd_id.' <- [Finish date : '.$this->final_date.']';
+							$this->cli_proc_title($info);
+						$this->download_info($csfd_id);
 						if($this->set_debug){
-							echo '{'.$count++.'} |'.$this->percentage($this->download_max_id,$csfd_id).'| [stranka cislo: '.$csfd_id.']'."\n";
-							echo '[Ocekavany cas dokonceni : '.$this->final_date.']'."\n";
-							echo '--------------------------------------------------------------------------------'."\n";
+							echo $info."	\r";
 						}
 						sleep($this->waiting_time);
 					}
@@ -243,30 +216,47 @@ class CSFD {
 						die();
 				}
 				for($csfd_id=$this->download_min_id;$csfd_id<=$this->download_id;$csfd_id++){
+					$info = get_class($this).' Downloader -> [Done : '.$this->percentage($this->download_id,$csfd_id).'] -> page : '.$this->download_id;
+					$this->cli_proc_title($info);
 					if($this->download_id==$csfd_id){
-						$page = $this->get_page($this->base_url.$csfd_id);
-						$hash = sha1($page['csfd_url_location']);
-						if($page['csfd_url_status']=='con_error'){/*do nothing*/}else{
-							if($this->set_proxy){
-								file_put_contents(realpath($this->download_folder).'/html/'.$csfd_id.'_'.$hash.'.html',file_get_contents($page['csfd_url_location'],false,stream_context_get_default()));
-							}else{
-								file_put_contents(realpath($this->download_folder).'/html/'.$csfd_id.'_'.$hash.'.html',file_get_contents($page['csfd_url_location']));
-							}
-						}
-						file_put_contents(realpath($this->download_folder).'/info/'.$csfd_id.'.info',$page['csfd_url_location']);
-						file_put_contents(realpath($this->download_folder).'/status/'.$csfd_id.'_status.info',$page['csfd_url_status']);
-						file_put_contents(realpath($this->download_folder).'/time/'.$csfd_id.'_time.info',time());
-						file_put_contents($this->time_stamp_file,time());
-						file_put_contents($this->record_file,$csfd_id);
+					$this->download_info($csfd_id);
+					$this->cli_proc_title($info);
 						if($this->set_debug){
-							echo '{'.$count++.'} |'.$this->percentage($this->download_id,$csfd_id).'| [stranka cislo: '.$csfd_id.']'."\n";
-							echo '--------------------------------------------------------------------------------'."\n";
+							echo $info."	\r";
 							sleep(3);
 						}
 					}
 				}
 			}
 		}
+	}
+	
+	public function download_info($csfd_id=false){
+		if($csfd_id==true){
+			$page = $this->get_page($this->base_url.$csfd_id);
+		}else{
+			$page = $this->get_page($this->download_url);
+			$csfd_id = uniqid();
+		}
+				$hash = sha1($page['csfd_url_location']);
+						if($page['csfd_url_status']=='con_error'){/*do nothing*/}else{
+							if($this->set_proxy){
+								$html_content = @file_get_contents($page['csfd_url_location'],false,stream_context_get_default());
+								
+							}else{
+								$html_content = @file_get_contents($page['csfd_url_location']);
+							}
+							if($html_content==true){
+								file_put_contents($this->html_folder.'/'.$csfd_id.'_'.$hash.'.html',$html_content);
+							}else{
+								$page['csfd_url_status'] = 'con_error';
+							}
+						}
+						file_put_contents($this->info_folder.'/'.$csfd_id.'.info',$page['csfd_url_location']);
+						file_put_contents($this->status_folder.'/'.$csfd_id.'_status.info',$page['csfd_url_status']);
+						file_put_contents($this->time_folder.'/'.$csfd_id.'_time.info',time());
+						file_put_contents($this->time_stamp_file,time());
+						file_put_contents($this->record_file,$csfd_id);
 	}
 	
 	public function get_page($get_page){
