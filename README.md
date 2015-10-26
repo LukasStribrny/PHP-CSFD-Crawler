@@ -6,10 +6,8 @@ But this feature is not included.
 
 ###1. Set download folder -> this is always required
 $this->CSFD->download_to($download_folder);
-###2. Set time stamp folder
-$this->CSFD->time_stamp_folder($time_stamp_folder);
 
-###3. Set one of three function to download page , for example by id or url
+###2. Set one of three function to download page , for example by id or url
 
 #####*if you want to download just one page with the id you provided*
 $this->CSFD->download_id($download_id);
@@ -27,7 +25,7 @@ $this->CSFD->base_url($base_url);
 ####*if you want to dowload page by provided url*
 $this->CSFD->download_url($download_url);
 
-####4. *if you want to use proxy settings*
+####3. *if you want to use proxy settings*
 $this->CSFD->set_proxy($set_proxy);
 
 #####example :
@@ -40,12 +38,12 @@ Add another array of proxy settings if you want to use more proxy -> this is bec
 The proxy is randomly selected.
 If you include more proxy you will have more chance to not get banned.
 
-####5.set debug to false if you don't want to see basic info about downloading
+####4.set debug to false if you don't want to see basic info about downloading
 #####info : This is used only when you download pages by id
 $this->CSFD->set_debug = false;
 
-####6.The last thing you have to do is run the download.
+####5.The last thing you have to do is run the download.
 $this->CSFD->download_run();
 
 #### Important information : 
-######Run it trought php cli to get best results then trought browser.Because the browser will crash after some time if there is a too long request of download.
+######Run it trought php cli to get best results then trought browser.Because the browser will/may crash after some time if there is a too long request of download.
